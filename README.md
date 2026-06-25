@@ -25,7 +25,7 @@ python main.py
 python ui.py
 ```
 
-Open http://127.0.0.1:8080, click **Generate result** to use automated gold/silver inputs, or click **Retrieve** to show the `news` string.
+Open http://127.0.0.1:8080, click **Generate result** to fetch latest real-world gold, silver, and dollar-index data, then run the regime analyzer. Click **Retrieve** to show the `news` string.
 
 ## Test
 

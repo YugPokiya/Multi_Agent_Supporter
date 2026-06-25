@@ -25,7 +25,7 @@ HTML = """<!doctype html>
 <body>
   <main>
     <h1>MACE Gold/Silver Market Analyzer</h1>
-    <p>Click <strong>Generate result</strong> to automatically fetch sample gold/silver inputs, run the agents, and store context in <code>store.json</code>.</p>
+    <p>Click <strong>Generate result</strong> to automatically fetch latest real-world gold/silver inputs, run the agents, and store context in <code>store.json</code>.</p>
     <button id="generate" onclick="generateResult()">Generate result</button>
     <button id="retrieve" onclick="retrieveNews()">Retrieve</button>
     <p><small>The Retrieve button shows the "news" string.</small></p>
@@ -61,8 +61,12 @@ class MarketAnalyzerUIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if self.path == "/api/generate":
-            market_input = fetch_market_inputs()
-            context = SimpleOrchestrator().run(market_input)
+            try:
+                market_input = fetch_market_inputs()
+                context = SimpleOrchestrator().run(market_input)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=502)
+                return
             self._send_json(context)
             return
         self.send_error(404, "Not found")
@@ -82,8 +86,8 @@ class MarketAnalyzerUIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body.encode("utf-8"))
 
-    def _send_json(self, body: dict) -> None:
-        self.send_response(200)
+    def _send_json(self, body: dict, status: int = 200) -> None:
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
         self.wfile.write(json.dumps(body, indent=2).encode("utf-8"))
