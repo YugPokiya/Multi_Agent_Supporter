@@ -1,7 +1,10 @@
 from app.market_data import MarketQuote, fetch_market_inputs
 from app.memory import InMemoryStore
 from app.orchestrator import SimpleOrchestrator
-from ui import HTML
+from pathlib import Path
+
+
+HTML = Path("static/index.html").read_text(encoding="utf-8")
 
 
 def fake_quote_fetcher(symbol: str) -> MarketQuote:
