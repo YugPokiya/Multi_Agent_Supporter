@@ -5,7 +5,7 @@ Phase 2 moved the unstructured http.server implementation to FastAPI in
 """
 
 
-def run_ui(host: str = "127.0.0.1", port: int = 8080) -> None:
+def run_ui(host: str = "127.0.0.1", port: int = 8081) -> None:
     import uvicorn
 
     uvicorn.run("app.main:app", host=host, port=port, reload=False)

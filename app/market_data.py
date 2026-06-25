@@ -61,7 +61,7 @@ def fetch_yahoo_quote(symbol: str) -> MarketQuote:
     encoded_symbol = quote(symbol, safe="")
     url = (
         "https://query1.finance.yahoo.com/v8/finance/chart/"
-        f"{encoded_symbol}?range=5d&interval=1d"
+        f"{encoded_symbol}?range=1d&interval=15m"
     )
     request = Request(
         url,
