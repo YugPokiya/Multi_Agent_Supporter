@@ -13,11 +13,19 @@ The app uses plain Python classes, an in-memory store, and a CLI workflow. It an
 - `InMemoryStore`: keeps runtime state and saves snapshots to `store.json`.
 - CLI interface: runs the end-to-end market analysis loop.
 
-## Run
+## Run CLI
 
 ```bash
 python main.py
 ```
+
+## Run UI
+
+```bash
+python ui.py
+```
+
+Open http://127.0.0.1:8080, click **Generate result** to use automated gold/silver inputs, or click **Retrieve** to show the `news` string.
 
 ## Test
 
