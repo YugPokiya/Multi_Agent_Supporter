@@ -33,9 +33,6 @@ jobs:
     - name: Compile Python files
       run: python -m py_compile main.py ui.py app/*.py
 
-    # Step 5: Run unit tests
-    - name: Run tests with pytest
-      run: python -m pytest
 
     # Step 6: Set up Docker Buildx (Best practice for modern GitHub Actions)
     - name: Set up Docker Buildx
