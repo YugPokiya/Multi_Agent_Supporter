@@ -2,7 +2,6 @@ import pytest
 
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
-
 from app.agents import MarketInput
 from app.main import app
 
@@ -10,8 +9,8 @@ from app.main import app
 @pytest.fixture
 def client(monkeypatch, tmp_path):
     from app.api import routes
-
-    monkeypatch.setattr(routes.settings, "store_path", str(tmp_path / "store.json"))
+    new_settings = routes.settings.model_copy(update={"store_path": str(tmp_path / "store.json")})
+    monkeypatch.setattr(routes, "settings", new_settings)    
     monkeypatch.setattr(
         routes,
         "fetch_market_inputs",
