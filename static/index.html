@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MACE Decision Board</title>
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --ink:#14171c; --muted:#646b75; --line:#e3e6ea;
+            --buy:#0f7b4f; --sell:#b42318; --hold:#6b7280; --accent:#2457d6; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#111317; --card:#1a1d23; --ink:#e8eaed; --muted:#9aa1ab; --line:#2b3038;
+              --buy:#3ccf8e; --sell:#ff6b5e; --hold:#9aa1ab; --accent:#7aa2ff; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; background:var(--bg); color:var(--ink); }
+    header { padding:20px 24px 8px; max-width:1200px; margin:auto; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    .sub { color:var(--muted); font-size:13px; margin:0; }
+    .controls { max-width:1200px; margin:auto; padding:12px 24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .controls label { display:flex; gap:6px; align-items:center; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); cursor:pointer; }
+    button { font:inherit; font-weight:600; padding:8px 14px; border-radius:8px; border:0; background:var(--accent); color:#fff; cursor:pointer; }
+    button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+    button:disabled { opacity:.5; cursor:wait; }
+    #status { color:var(--muted); font-size:13px; }
+    main { max-width:1200px; margin:auto; padding:8px 24px 40px; display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+    @media (max-width:600px) { main, .controls, header { padding-left:16px; padding-right:16px; } main { grid-template-columns:1fr; } }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .top { display:flex; justify-content:space-between; align-items:baseline; }
+    .inst { font-size:18px; font-weight:700; }
+    .badge { font-weight:800; font-size:18px; letter-spacing:.04em; }
+    .BUY { color:var(--buy); } .SELL { color:var(--sell); } .HOLD { color:var(--hold); }
+    .meta { color:var(--muted); font-size:12px; margin:2px 0 10px; }
+    .explain { font-size:13px; margin:0 0 10px; }
+    .meter { position:relative; height:8px; background:var(--line); border-radius:4px; margin:4px 0 12px; }
+    .meter span { position:absolute; top:0; bottom:0; border-radius:4px; }
+    .meter i { position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--muted); }
+    table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    td { padding:4px 4px; border-top:1px solid var(--line); vertical-align:top; }
+    td.a { white-space:nowrap; font-weight:600; }
+    .abst { color:var(--muted); }
+    .probs { display:flex; gap:6px; margin:6px 0 10px; font-size:12px; }
+    .probs div { flex:1; } .probs b { display:block; height:6px; border-radius:3px; margin-top:2px; }
+    .tag { font-size:11px; padding:1px 6px; border-radius:6px; border:1px solid var(--line); color:var(--muted); }
+    .risk { font-size:12.5px; margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:2px 12px; }
+    .err { color:var(--sell); }
+    footer { max-width:1200px; margin:auto; padding:0 24px 30px; color:var(--muted); font-size:12px; }
+    #history table { background:var(--card); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MACE Multi-Agent Decision Board</h1>
+    <p class="sub">An ML model and five rule-based agents vote BUY / SELL / HOLD; a risk agent and an evaluator approve or downgrade the result. Educational only, not financial advice.</p>
+  </header>
+  <div class="controls" id="controls"></div>
+  <main id="board"><p class="sub">Choose instruments and press <b>Generate decisions</b>.</p></main>
+  <footer>
+    <div id="history"></div>
+    <p>Legacy endpoints: <a href="#" onclick="legacy();return false">gold/silver regime report</a> · <a href="/docs">API docs</a></p>
+    <pre id="legacy" style="white-space:pre-wrap"></pre>
+  </footer>
+<script>
+const INSTR = ["XAU","XAG","BTC","NIFTY","CRUDE"];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = (x) => (x * 100).toFixed(0) + "%";
+const fmt = (x, d = 2) => Number(x).toLocaleString("en-US", { maximumFractionDigits: d });
+
+$("controls").innerHTML = INSTR.map(i =>
+  `<label><input type="checkbox" value="${i}" ${i !== "CRUDE" ? "checked" : ""}> ${i}</label>`).join("") +
+  `<button id="go">Generate decisions</button><button class="ghost" id="hist">History</button><span id="status"></span>`;
+
+function meter(score, thr) {
+  const x = Math.max(-1, Math.min(1, score)), mid = 50, w = Math.abs(x) * 50;
+  const color = x > thr ? "var(--buy)" : x < -thr ? "var(--sell)" : "var(--hold)";
+  return `<div class="meter" title="score ${x.toFixed(2)}, threshold ±${thr.toFixed(2)}">
+    <span style="left:${x >= 0 ? mid : mid - w}%;width:${w}%;background:${color}"></span>
+    <i style="left:${mid - thr * 50}%"></i><i style="left:${mid + thr * 50}%"></i></div>`;
+}
+
+function card(d) {
+  if (d.error) return `<div class="card"><div class="inst">${esc(d.instrument)}</div><p class="err">${esc(d.error)}</p></div>`;
+  const ml = d.ml || {}, p = ml.probabilities || {}, r = d.risk || {}, ev = d.evaluation || {};
+  const probs = ml.probabilities ? `<div class="probs">${["SELL","HOLD","BUY"].map(k =>
+      `<div>${k} ${pct(p[k])}<b style="width:${p[k]*100}%;background:var(--${k.toLowerCase()})"></b></div>`).join("")}
+      <span class="tag">${ml.has_edge ? "model has edge" : "no proven edge → ignored"}</span></div>` : "";
+  const votes = d.votes.map(v => `<tr class="${v.abstained ? "abst" : ""}">
+      <td class="a">${esc(v.agent)}</td>
+      <td class="${v.abstained ? "" : v.action}">${v.abstained ? "—" : v.action + " " + v.confidence.toFixed(2)}</td>
+      <td>${esc(v.reasons[0])}</td></tr>`).join("");
+  const levels = d.final_action !== "HOLD" ? `<div class="risk">
+      <div>Entry ref <b>${fmt(r.entry_reference)}</b></div><div>Stop <b>${fmt(r.stop_loss)}</b></div>
+      <div>Target <b>${fmt(r.target)}</b></div><div>Size <b>${fmt(r.position_units, 4)}</b> units</div></div>` : "";
+  const vetoes = (r.vetoes || []).length ? `<p class="meta err">Vetoes: ${esc(r.vetoes.join("; "))}</p>` : "";
+  return `<div class="card">
+    <div class="top"><span class="inst">${esc(d.instrument)}</span><span class="badge ${d.final_action}">${d.final_action}</span></div>
+    <div class="meta">as of ${esc(d.as_of)} · close ${fmt(d.last_close)} · ${esc(d.regime.replace(/_/g," "))} · evaluator: ${esc(ev.verdict)} · data: ${esc(d.data_source)}</div>
+    ${meter(d.aggregate.score, d.aggregate.threshold)}
+    <p class="explain">${esc(d.explanation)}</p>
+    ${probs}
+    <table>${votes}</table>${levels}${vetoes}
+  </div>`;
+}
+
+$("go").onclick = async () => {
+  const instruments = [...document.querySelectorAll("#controls input:checked")].map(x => x.value);
+  if (!instruments.length) return;
+  $("go").disabled = true; $("status").textContent = "Running agents…";
+  try {
+    const res = await fetch("/api/decisions", { method: "POST", headers: {"Content-Type": "application/json"},
+                                                body: JSON.stringify({ instruments }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(JSON.stringify(data.detail || data));
+    $("board").innerHTML = data.decisions.map(card).join("");
+    $("status").textContent = Object.entries(data.summary).map(([k, v]) => `${k}: ${v}`).join(" · ");
+  } catch (e) { $("status").textContent = "Error: " + e.message; }
+  $("go").disabled = false;
+};
+
+$("hist").onclick = async () => {
+  const rows = await (await fetch("/api/decisions/history?limit=30")).json();
+  $("history").innerHTML = `<h3>Recent decisions</h3><table><tr><td>When (UTC)</td><td>Instrument</td><td>As of</td><td>Raw</td><td>Final</td><td>Score</td><td>Regime</td></tr>` +
+    rows.map(r => `<tr><td>${esc(r.created_at.slice(0,19))}</td><td>${r.instrument}</td><td>${r.as_of}</td><td class="${r.raw_action}">${r.raw_action}</td>
+      <td class="${r.final_action}">${r.final_action}</td><td>${r.score.toFixed(2)}</td><td>${esc(r.regime)}</td></tr>`).join("") + `</table>`;
+};
+
+async function legacy() {
+  const res = await fetch("/api/generate", { method: "POST" });
+  $("legacy").textContent = JSON.stringify(await res.json(), null, 2);
+}
+</script>
+</body>
+</html>
